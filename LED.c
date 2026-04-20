@@ -38,6 +38,9 @@ void LedOn(ucLedIndeks)
 			IO1SET = LED3_bm;
 			break;
 		}
+		default:
+		{
+		}
 	}
 }
 
