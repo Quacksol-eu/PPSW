@@ -30,7 +30,7 @@ unsigned int uiCurrentPosition;
 unsigned int uiDesiredPosition;
 }; 
 
-struct Servo sServo;
+volatile struct Servo sServo;
 
 void Automat() 
 {

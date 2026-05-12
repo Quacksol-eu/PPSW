@@ -1,4 +1,7 @@
 #include <LPC21XX.H>
+#include "LED.h"
+#include "string.h"
+#define NULL '\0'
 
 /************ UART ************/
 // U0LCR Line Control Register
@@ -14,6 +17,8 @@
 #define mTHRE_INTERRUPT_PENDING                    0x00000002
 #define mRX_DATA_AVALIABLE_INTERRUPT_PENDING       0x00000004
 
+#define RECIEVER_SIZE 20
+
 /************ Interrupts **********/
 // VIC (Vector Interrupt Controller) channels
 #define VIC_UART0_CHANNEL_NR  6
@@ -27,6 +32,60 @@ volatile char cOdebranyZnak;
 
 
 ///////////////////////////////////////////
+
+enum eRecieverStatus {EMPTY, READY, OVERFLOW};
+
+struct RecieverBuffer
+{ 
+	char cData[RECIEVER_SIZE];
+	unsigned char ucCharCtr;
+	enum eRecieverStatus eStatus;
+};
+
+struct RecieverBuffer sRecieverBuffer;
+
+void Reciever_PutCharacterToBuffer(char cCharacter)
+{
+	switch(sRecieverBuffer.eStatus)
+	{
+		case(EMPTY):
+		{
+			if(cCharacter == 'q')
+			{
+				sRecieverBuffer.cData[sRecieverBuffer.ucCharCtr] = NULL;
+				sRecieverBuffer.ucCharCtr = 0;
+				sRecieverBuffer.eStatus = READY;
+				break;
+			}
+			else if(sRecieverBuffer.ucCharCtr >= (RECIEVER_SIZE - 1)) 
+      {
+           sRecieverBuffer.eStatus = OVERFLOW;
+      }
+			else 
+			{
+				sRecieverBuffer.cData[sRecieverBuffer.ucCharCtr] = cCharacter;
+				sRecieverBuffer.ucCharCtr++;
+			}
+			break;
+		}
+		case(READY):
+		{
+			break;
+		}
+		case(OVERFLOW):
+		{
+			if(cCharacter == 'q')
+			{
+				sRecieverBuffer.cData[sRecieverBuffer.ucCharCtr] = NULL;
+				sRecieverBuffer.ucCharCtr = 0;
+				sRecieverBuffer.eStatus = READY;
+			}
+			break;
+		}
+	}
+}
+
+////////////////////////////////////////
 __irq void UART0_Interrupt (void) {
    // jesli przerwanie z odbiornika (Rx)
    
@@ -35,6 +94,7 @@ __irq void UART0_Interrupt (void) {
    if      ((uiCopyOfU0IIR & mINTERRUPT_PENDING_IDETIFICATION_BITFIELD) == mRX_DATA_AVALIABLE_INTERRUPT_PENDING) // odebrano znak
    {
       cOdebranyZnak = U0RBR;
+			Reciever_PutCharacterToBuffer(cOdebranyZnak);
    } 
    
    if ((uiCopyOfU0IIR & mINTERRUPT_PENDING_IDETIFICATION_BITFIELD) == mTHRE_INTERRUPT_PENDING)              // wyslano znak - nadajnik pusty 
@@ -60,5 +120,3 @@ void UART_InitWithInt(unsigned int uiBaudRate){
    VICVectCntl2  = mIRQ_SLOT_ENABLE | VIC_UART0_CHANNEL_NR;     // use it for UART 0 Interrupt
    VICIntEnable |= (0x1 << VIC_UART0_CHANNEL_NR);               // Enable UART 0 Interrupt Channel
 }
-
-
