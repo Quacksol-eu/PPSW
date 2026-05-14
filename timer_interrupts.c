@@ -12,6 +12,18 @@
 
 #define mIRQ_SLOT_ENABLE 0x00000020
 
+struct Watch 
+{ 
+	unsigned char ucMinutes;
+	unsigned char ucSeconds; 
+  unsigned char fSecondsValueChanged;
+  unsigned char fMinutesValueChanged;
+};
+
+struct Watch sWatch;
+
+
+
 void (*ptrTimer0InterruptFunction)(void);
 
 __irq void Timer0IRQHandler()
@@ -20,6 +32,10 @@ __irq void Timer0IRQHandler()
 	if (ptrTimer0InterruptFunction)
 	{
 		ptrTimer0InterruptFunction();
+	}
+	else
+	{
+		LedOn(0);
 	}
 	VICVectAddr=0x00; 	
 }
@@ -36,4 +52,31 @@ void Timer0Interrupts_Init(unsigned int uiPeriod, void (*ptrInterruptFunction)(v
 	T0MCR |= (mINTERRUPT_ON_MR0 | mRESET_ON_MR0); 
 	T0TCR |=  mCOUNTER_ENABLE; 
 
+}
+
+#define VIC_TIMER1_CHANNEL_NR 5 // Timer1 to kanal 5 w VIC
+
+void (*ptrTimer1InterruptFunction)(void);
+
+__irq void Timer1IRQHandler()
+{
+    T1IR = mMR0_INTERRUPT; // Rejestr przerwan dla Timer1
+    if (ptrTimer1InterruptFunction)
+    {
+        ptrTimer1InterruptFunction();
+    }
+    VICVectAddr = 0x00;
+}
+
+void Timer1Interrupts_Init(unsigned int uiPeriod, void (*ptrInterruptFunction)(void))
+{ 
+    ptrTimer1InterruptFunction = ptrInterruptFunction;
+
+    VICIntEnable |= (0x1 << VIC_TIMER1_CHANNEL_NR);          
+    VICVectCntl4  = mIRQ_SLOT_ENABLE | VIC_TIMER1_CHANNEL_NR; 
+    VICVectAddr4  = (unsigned long)Timer1IRQHandler;          
+
+    T1MR0 = 15 * uiPeriod;                   
+    T1MCR |= (mINTERRUPT_ON_MR0 | mRESET_ON_MR0); 
+    T1TCR |= mCOUNTER_ENABLE; 
 }
