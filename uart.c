@@ -1,4 +1,7 @@
 #include <LPC21XX.H>
+#include "LED.h"
+#include "string.h"
+#define NULL '\0'
 
 /************ UART ************/
 // U0LCR Line Control Register
@@ -14,6 +17,9 @@
 #define mTHRE_INTERRUPT_PENDING                    0x00000002
 #define mRX_DATA_AVALIABLE_INTERRUPT_PENDING       0x00000004
 
+#define RECIEVER_SIZE 20
+#define TRANSMITER_SIZE 20
+#define TERMINATOR '>'
 /************ Interrupts **********/
 // VIC (Vector Interrupt Controller) channels
 #define VIC_UART0_CHANNEL_NR  6
@@ -26,7 +32,103 @@
 volatile char cOdebranyZnak;
 
 
-///////////////////////////////////////////
+///////////////NADAWANIE/////////////////
+enum eTransmiterStatus {FREE, BUSY};
+struct TransmiterBuffer
+{
+	char cData[TRANSMITER_SIZE];
+	enum eTransmiterStatus eStatus;
+	unsigned char fLastCharacter;
+	unsigned char cCharCtr;
+};
+
+struct TransmiterBuffer sTransmiterBuffer;
+
+char cTransmiter_GetCharacterFromBuffer()
+{
+	if ((sTransmiterBuffer.cData[sTransmiterBuffer.cCharCtr] != NULL) && (sTransmiterBuffer.cCharCtr < TRANSMITER_SIZE))
+	{
+		return sTransmiterBuffer.cData[sTransmiterBuffer.cCharCtr++];
+	}
+	else if (sTransmiterBuffer.fLastCharacter == 0)
+	{
+		sTransmiterBuffer.fLastCharacter = 1;
+		return TERMINATOR;
+	}
+	else
+	{
+		return NULL;
+	}
+}
+
+void Transmiter_SendString(char cString[])
+{
+	while(sTransmiterBuffer.eStatus == BUSY);
+	CopyString(cString , sTransmiterBuffer.cData);
+	sTransmiterBuffer.fLastCharacter = 0;
+	sTransmiterBuffer.cCharCtr = 0;
+	sTransmiterBuffer.eStatus = BUSY;
+	U0THR = cTransmiter_GetCharacterFromBuffer();
+}
+
+enum eTransmiterStatus Transmiter_GetStatus(void)
+{
+	return sTransmiterBuffer.eStatus;
+}
+////////////////ODBIERANIE///////////////////
+enum eRecieverStatus {EMPTY, READY, OVERFLOW};
+
+struct RecieverBuffer
+{ 
+	char cData[RECIEVER_SIZE];
+	unsigned char ucCharCtr;
+	enum eRecieverStatus eStatus;
+};
+
+struct RecieverBuffer sRecieverBuffer;
+
+void Reciever_PutCharacterToBuffer(char cCharacter)
+{
+	switch(sRecieverBuffer.eStatus)
+	{
+		case(EMPTY):
+		{
+			if(cCharacter == TERMINATOR)
+			{
+				sRecieverBuffer.cData[sRecieverBuffer.ucCharCtr] = NULL;
+				sRecieverBuffer.ucCharCtr = 0;
+				sRecieverBuffer.eStatus = READY;
+				break;
+			}
+			else if(sRecieverBuffer.ucCharCtr >= (RECIEVER_SIZE - 1)) 
+      {
+           sRecieverBuffer.eStatus = OVERFLOW;
+      }
+			else 
+			{
+				sRecieverBuffer.cData[sRecieverBuffer.ucCharCtr] = cCharacter;
+				sRecieverBuffer.ucCharCtr++;
+			}
+			break;
+		}
+		case(READY):
+		{
+			break;
+		}
+		case(OVERFLOW):
+		{
+			if(cCharacter == TERMINATOR)
+			{
+				sRecieverBuffer.cData[sRecieverBuffer.ucCharCtr] = NULL;
+				sRecieverBuffer.ucCharCtr = 0;
+				sRecieverBuffer.eStatus = READY;
+			}
+			break;
+		}
+	}
+}
+
+////////////////////////////////////////
 __irq void UART0_Interrupt (void) {
    // jesli przerwanie z odbiornika (Rx)
    
@@ -35,11 +137,20 @@ __irq void UART0_Interrupt (void) {
    if      ((uiCopyOfU0IIR & mINTERRUPT_PENDING_IDETIFICATION_BITFIELD) == mRX_DATA_AVALIABLE_INTERRUPT_PENDING) // odebrano znak
    {
       cOdebranyZnak = U0RBR;
+			Reciever_PutCharacterToBuffer(cOdebranyZnak);
    } 
    
    if ((uiCopyOfU0IIR & mINTERRUPT_PENDING_IDETIFICATION_BITFIELD) == mTHRE_INTERRUPT_PENDING)              // wyslano znak - nadajnik pusty 
    {
-      // narazie nic nie wysylamy
+		  char cZnakDoNadania = cTransmiter_GetCharacterFromBuffer();
+      if(cZnakDoNadania != NULL)
+			{
+				U0THR = cZnakDoNadania;
+			}
+			else
+			{
+				sTransmiterBuffer.eStatus = FREE;
+			}
    }
 
    VICVectAddr = 0; // Acknowledge Interrupt
@@ -53,12 +164,10 @@ void UART_InitWithInt(unsigned int uiBaudRate){
    U0LCR  |= m8BIT_UART_WORD_LENGTH | mDIVISOR_LATCH_ACCES_BIT; // dlugosc slowa, DLAB = 1
    U0DLL   = ((15000000)/16)/uiBaudRate;                      // predkosc transmisji
    U0LCR  &= (~mDIVISOR_LATCH_ACCES_BIT);                       // DLAB = 0
-   U0IER  |= mRX_DATA_AVALIABLE_INTERRUPT_ENABLE;               // Wlaczamy wysylanie flag przerwan z uart
+   U0IER  |= (mRX_DATA_AVALIABLE_INTERRUPT_ENABLE | mTHRE_INTERRUPT_ENABLE);               // Wlaczamy wysylanie flag przerwan z uart
 
    // INT
    VICVectAddr2  = (unsigned long) UART0_Interrupt;             // set interrupt service routine address
    VICVectCntl2  = mIRQ_SLOT_ENABLE | VIC_UART0_CHANNEL_NR;     // use it for UART 0 Interrupt
    VICIntEnable |= (0x1 << VIC_UART0_CHANNEL_NR);               // Enable UART 0 Interrupt Channel
 }
-
-

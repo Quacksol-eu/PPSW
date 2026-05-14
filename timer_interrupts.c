@@ -12,6 +12,18 @@
 
 #define mIRQ_SLOT_ENABLE 0x00000020
 
+struct Watch 
+{ 
+	unsigned char ucMinutes;
+	unsigned char ucSeconds; 
+  unsigned char fSecondsValueChanged;
+  unsigned char fMinutesValueChanged;
+};
+
+struct Watch sWatch;
+
+
+
 void (*ptrTimer0InterruptFunction)(void);
 
 __irq void Timer0IRQHandler()
@@ -20,6 +32,10 @@ __irq void Timer0IRQHandler()
 	if (ptrTimer0InterruptFunction)
 	{
 		ptrTimer0InterruptFunction();
+	}
+	else
+	{
+		LedOn(0);
 	}
 	VICVectAddr=0x00; 	
 }
