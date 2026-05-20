@@ -46,18 +46,18 @@ struct TransmiterBuffer sTransmiterBuffer;
 
 char cTransmiter_GetCharacterFromBuffer()
 {
-	if ((sTransmiterBuffer.cData[sTransmiterBuffer.cCharCtr] != NULL) && (sTransmiterBuffer.cCharCtr < TRANSMITER_SIZE))
+	if (sTransmiterBuffer.fLastCharacter == 1)
 	{
-		return sTransmiterBuffer.cData[sTransmiterBuffer.cCharCtr++];
+		return NULL;
 	}
-	else if (sTransmiterBuffer.fLastCharacter == 0)
+	else if (sTransmiterBuffer.cData[sTransmiterBuffer.cCharCtr] == NULL)
 	{
 		sTransmiterBuffer.fLastCharacter = 1;
 		return TERMINATOR;
 	}
 	else
 	{
-		return NULL;
+		return sTransmiterBuffer.cData[sTransmiterBuffer.cCharCtr++];
 	}
 }
 

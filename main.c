@@ -5,9 +5,6 @@
 extern struct RecieverBuffer sRecieverBuffer;
 extern struct TransmiterBuffer sTransmiterBuffer;
 extern struct Watch sWatch;
-char cTimerSecondsBase[15] = "sec ";
-char cTimerMinutesBase[15] = "min ";
-char cCalcBase[15] = "calc ";
 char cBufferRecieved[20];
 
 void WatchUpdate()
@@ -24,6 +21,7 @@ void WatchUpdate()
 
 int main()
 {
+	char cMsgBuffer[20];
 	Timer0Interrupts_Init((1000000),&WatchUpdate);
 	UART_InitWithInt(9600);
 	while(1)
@@ -33,33 +31,40 @@ int main()
 			Reciever_GetStringCopy(cBufferRecieved);
 			DecodeMsg(cBufferRecieved);
 		}
-		if ((sTransmiterBuffer.eStatus == FREE) && ((asToken[0].eType == KEYWORD) && (asToken[0].uValue.eKeyword == CLC)))
-		{
-			if(asToken[1].eType == NUMBER)
-      {				
-				AppendUIntToString((asToken[1].uValue.uiNumber * 2) , cCalcBase);
-				Transmiter_SendString(cCalcBase);
-				CopyString("calc ", cCalcBase);
-				asToken[1].uValue.uiNumber = 0;
-        asToken[1].uValue.uiNumber = 0;				
-				asToken[0].eType = STRING;
-				asToken[1].eType = STRING;
-		  }
-		}
-		if ((sTransmiterBuffer.eStatus == FREE) && (sWatch.fMinutesValueChanged == 1))
-		{
-			sWatch.fMinutesValueChanged = 0;
-			AppendUIntToString(sWatch.ucMinutes, cTimerMinutesBase);
-			Transmiter_SendString(cTimerMinutesBase);
-			CopyString("min ", cTimerMinutesBase);
-		}
-		else if ((sTransmiterBuffer.eStatus == FREE) && (sWatch.fSecondsValueChanged == 1))
-		{
-			sWatch.fSecondsValueChanged = 0;
-			AppendUIntToString(sWatch.ucSeconds, cTimerSecondsBase);
-			Transmiter_SendString(cTimerSecondsBase);
-			CopyString("sec ", cTimerSecondsBase);
-		}
 		
-	}
+		////////////////////////////////
+	
+		if (sTransmiterBuffer.eStatus == FREE)
+		{
+			if ((asToken[0].eType == KEYWORD) && (asToken[0].uValue.eKeyword == CLC) && (asToken[1].eType == NUMBER))
+			{               
+				CopyString("calc ", cMsgBuffer);
+				AppendUIntToString((asToken[1].uValue.uiNumber * 2), cMsgBuffer);
+				AppendString("\r\n", cMsgBuffer);
+				
+				Transmiter_SendString(cMsgBuffer);
+				
+				asToken[0].eType = STRING;
+			}
+			else if (sWatch.fMinutesValueChanged == 1)
+			{
+				sWatch.fMinutesValueChanged = 0;
+				CopyString("min ", cMsgBuffer);
+				AppendUIntToString(sWatch.ucMinutes, cMsgBuffer);
+				AppendString("\r\n", cMsgBuffer);
+				
+				Transmiter_SendString(cMsgBuffer);
+			}
+			else if (sWatch.fSecondsValueChanged == 1)
+			{
+				sWatch.fSecondsValueChanged = 0;
+
+				CopyString("sec ", cMsgBuffer);
+				AppendUIntToString(sWatch.ucSeconds, cMsgBuffer);
+				AppendString("\r\n", cMsgBuffer);
+				
+				Transmiter_SendString(cMsgBuffer);
+			}
+		}
+   }
 }

@@ -12,6 +12,15 @@ void CopyString(char pcSource[], char pcDestination[]){
 	pcDestination[ucCharacterCounter] = pcSource[ucCharacterCounter]; 
 }
 
+void AppendString(char pcSourceStr[], char pcDestinationStr[])
+{
+	unsigned char ucCharacterCounter;
+	for (ucCharacterCounter = 0; pcDestinationStr[ucCharacterCounter] != NULL; ucCharacterCounter++)
+	{
+	}
+	CopyString(pcSourceStr, pcDestinationStr + ucCharacterCounter);
+}
+
 void UIntToHexStr(unsigned int uiValue, char pcStr[])
 {
     unsigned int uiNibbleCounter;
